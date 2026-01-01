@@ -1,53 +1,6 @@
-// const express = require('express');
-// const cors = require('cors');
-// require('dotenv').config();
-// const { MongoClient, ServerApiVersion } = require('mongodb');
-
-// const app = express();
-// const port = process.env.PORT || 3000;
-
-// app.use(cors());
-// app.use(express.json());
 
 
 
-
-// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.lftgrs4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-
-// // Create a MongoClient with a MongoClientOptions object to set the Stable API version
-// const client = new MongoClient(uri, {
-//   serverApi: {
-//     version: ServerApiVersion.v1,
-//     strict: true,
-//     deprecationErrors: true,
-//   }
-// });
-
-// async function run() {
-//   try {
-//     // Connect the client to the server	(optional starting in v4.7)
-//     await client.connect();
-//     // Send a ping to confirm a successful connection
-//     await client.db("admin").command({ ping: 1 });
-//     console.log("Pinged your deployment. You successfully connected to MongoDB!");
-//   } finally {
-//     // Ensures that the client will close when you finish/error
-//     await client.close();
-//   }
-// }
-// run().catch(console.dir);
-
-
-
-// app.get('/',(req,res)=>{
-//     res.send('founder is on the way')
-// });
-
-// app.listen(port, ()=>{
-//     console.log(`the founder server is running on port ${port}`);
-// })
-
-// server.js
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
@@ -56,15 +9,14 @@ const { MongoClient, ServerApiVersion } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(
-  cors({
-    origin: "*",
-  })
-);
+// Middleware
+app.use(cors({ origin: "http://localhost:8080" }));
 app.use(express.json());
 
-// MongoDB connection URI
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.lftgrs4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+// MongoDB URI
+// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.lftgrs4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.1eyo3nk.mongodb.net/?appName=Cluster0`;
 
 const client = new MongoClient(uri, {
   serverApi: {
@@ -74,46 +26,58 @@ const client = new MongoClient(uri, {
   },
 });
 
-async function run() {
+let callRequestCollection;
+
+// Connect to MongoDB and start server
+async function startServer() {
   try {
     await client.connect();
-    const db = client.db("founderDB");
-    const requestsCollection = db.collection("callRequests");
+    console.log("✅ MongoDB connected");
 
-    // ✅ POST: Save request call form data
-    app.post("/api/request-call", async (req, res) => {
-      const { name, email, goals } = req.body;
-      if (!name || !email || !goals) {
-        return res.status(400).send({ message: "All fields are required" });
-      }
+    const db = client.db("founderAcademy");
+    callRequestCollection = db.collection("callRequests");
 
-      const result = await requestsCollection.insertOne({
-        name,
-        email,
-        goals,
-        date: new Date(),
-      });
-
-      res.send({
-        success: true,
-        message: "Request saved successfully!",
-        data: result,
-      });
+    // Health check
+    app.get("/", (req, res) => {
+      res.send("Founder Academy Server Running 🚀");
     });
 
-    // ✅ Default route
-    app.get("/", (req, res) => {
-      res.send("🚀 The Founder server is running successfully!");
+    // POST /request-call
+    app.post("/request-call", async (req, res) => {
+      try {
+        const { name, email, company, goals } = req.body;
+
+        if (!name || !email || !goals) {
+          return res.status(400).send({ message: "Required fields missing" });
+        }
+
+        const newRequest = {
+          name,
+          email,
+          company,
+          goals,
+          createdAt: new Date(),
+        };
+
+        const result = await callRequestCollection.insertOne(newRequest);
+
+        res.send({
+          success: true,
+          message: "Request saved successfully",
+          insertedId: result.insertedId,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ success: false, message: "Server error" });
+      }
     });
 
     app.listen(port, () => {
-      console.log(`✅ The Founder server is running on port ${port}`);
+      console.log(`🔥 Server running on port ${port}`);
     });
-
-    console.log("✅ Connected to MongoDB!");
   } catch (err) {
-    console.error("❌ Error connecting to MongoDB:", err);
+    console.error("MongoDB connection failed:", err);
   }
 }
 
-run().catch(console.dir);
+startServer();
